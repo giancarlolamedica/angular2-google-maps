@@ -296,6 +296,11 @@ export interface Polygon extends MVCObject {
   setVisible(visible: boolean): void;
 }
 
+export interface Projection  {
+  fromLatLngToPoint(latLng: LatLng, point?: Point): Point;
+  fromPointToLatLng(pixel: Point, nowrap?: boolean): LatLng;
+}
+
 export interface KmlLayer extends MVCObject {
   getDefaultViewport(): LatLngBounds;
   getMap(): GoogleMap;

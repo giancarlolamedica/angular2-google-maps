@@ -19,14 +19,28 @@ export class GoogleMapsAPIWrapper {
   private _map: Promise<mapTypes.GoogleMap>;
   private _mapResolver: (value?: mapTypes.GoogleMap) => void;
 
+  private _projection: Promise<mapTypes.Projection>;
+  private _projectionResolver: (value?: mapTypes.Projection) => void;
+
   constructor(private _loader: MapsAPILoader, private _zone: NgZone) {
     this._map =
         new Promise<mapTypes.GoogleMap>((resolve: () => void) => { this._mapResolver = resolve; });
+    this._projection =
+        new Promise<mapTypes.Projection>((resolve: () => void) => { this._projectionResolver = resolve; });
+    this._projection.then(() => {} );
+
   }
 
   createMap(el: HTMLElement, mapOptions: mapTypes.MapOptions): Promise<void> {
+    let t = this;
     return this._loader.load().then(() => {
       const map = new google.maps.Map(el, mapOptions);
+      map.addListener('projection_changed', function() {
+        let prj = map.getProjection();
+        if (prj != null) {
+          t._projectionResolver(prj);
+        }
+      });
       this._mapResolver(<mapTypes.GoogleMap>map);
       return;
     });
@@ -132,5 +146,29 @@ export class GoogleMapsAPIWrapper {
    */
   triggerMapEvent(eventName: string): Promise<void> {
     return this._map.then((m) => google.maps.event.trigger(m, eventName));
+  }
+
+  fromLatLngToPoint(coords: Array<mapTypes.LatLngLiteral>): Promise<Array<mapTypes.Point>> {
+    let f: (value?: Array<mapTypes.Point>) => void;
+    let p = new Promise<Array<mapTypes.Point>>((resolve: () => void) => { f = resolve; });
+
+    this._map.then(map => {
+      this._projection.then((projection: mapTypes.Projection) => {
+        let ret = new Array<mapTypes.Point>();
+        for (let latlng of coords) {
+          ret.push(this._fromLatLngToPoint(map, projection, latlng.lat, latlng.lng));
+        }
+        f(ret);
+      });
+    });
+    return p;
+  }
+
+  private _fromLatLngToPoint(map: any, projection: any, latitude: number, longitude: number): mapTypes.Point {
+    let latlng: mapTypes.LatLng = new google.maps.LatLng(latitude, longitude);
+    let worldPoint: mapTypes.Point = projection.fromLatLngToPoint(latlng);
+    var scale = Math.pow(2, map.getZoom());
+    let scaledPoint: mapTypes.Point = new google.maps.Point(worldPoint.x * scale, worldPoint.y * scale);
+    return scaledPoint; 
   }
 }
